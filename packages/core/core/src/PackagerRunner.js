@@ -2,7 +2,7 @@
 
 import type {ParcelOptions, Blob, FilePath} from '@parcel/types';
 import type {Bundle as InternalBundle} from './types';
-import type Config from './Config';
+import type Config from './ParcelConfig';
 
 import {mkdirp, writeFile} from '@parcel/fs';
 import {NamedBundle} from './public/Bundle';
