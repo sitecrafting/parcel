@@ -28,6 +28,7 @@ import {
   TapStream
 } from '@parcel/utils';
 import Cache from '@parcel/cache';
+import nullthrows from 'nullthrows';
 import Dependency from './Dependency';
 
 type AssetOptions = {|
@@ -68,6 +69,7 @@ export default class Asset {
   dependencies: Map<string, IDependency>;
   connectedFiles: Map<FilePath, File>;
   isIsolated: boolean;
+  depToBundlePath: ?Map<string, FilePath>;
   outputHash: string;
   env: Environment;
   meta: Meta;
@@ -169,10 +171,23 @@ export default class Asset {
     }
 
     if (typeof this.content === 'string' || this.content instanceof Buffer) {
-      return this.content.toString();
+      this.content = this.content.toString();
+    } else {
+      this.content = (await bufferStream(this.content)).toString();
     }
 
-    this.content = (await bufferStream(this.content)).toString();
+    let content = this.content;
+    let depToBundlePath = this.depToBundlePath;
+    if (depToBundlePath != null) {
+      // If a dependency-to-bundle-path mapping is set, replace
+      // references to dependencies with their proper bundle urls
+      this.content = replaceReferences(
+        content,
+        this.getDependencies(),
+        depToBundlePath
+      );
+    }
+
     return this.content;
   }
 
@@ -347,4 +362,33 @@ export default class Asset {
   async getPackage(): Promise<PackageJSON | null> {
     return this.getConfig(['package.json']);
   }
+}
+
+function replaceReferences(
+  code: string,
+  dependencies: Array<IDependency>,
+  depToBundlePath: Map<string, FilePath>
+): string {
+  let output = code;
+  // replace references to url dependencies with relative paths to their
+  // corresponding bundles.
+  // TODO: This likely alters the length of the column in the source text.
+  //       Update any sourcemaps accordingly.
+  for (let dep of dependencies) {
+    if (!dep.isURL) {
+      continue;
+    }
+
+    let split = output.split(dep.id);
+    if (split.length > 1) {
+      // the dependency id was found in the text. replace it.
+      let replacement = nullthrows(
+        depToBundlePath.get(dep.id),
+        'replacement text not found for a dependency placeholder'
+      );
+      output = split.join(replacement);
+    }
+  }
+
+  return output;
 }
