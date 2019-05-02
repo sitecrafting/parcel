@@ -11,6 +11,7 @@ import WorkerFarm from '@parcel/workers';
 import TargetResolver from './TargetResolver';
 import getRootDir from '@parcel/utils/src/getRootDir';
 import loadEnv from './loadEnv';
+import loadParcelConfig from './loadParcelConfig';
 import path from 'path';
 import Cache from '@parcel/cache';
 import Watcher from '@parcel/watcher';
@@ -55,8 +56,12 @@ export default class Parcel {
       this.options.env = process.env;
     }
 
+    // ? What to use for filePath
+    let config = await loadParcelConfig(this.options.cwd, this.options);
+
     this.farm = await WorkerFarm.getShared(
       {
+        config,
         options: this.options,
         env: this.options.env
       },
@@ -66,6 +71,7 @@ export default class Parcel {
     );
 
     this.bundlerRunner = new BundlerRunner({
+      config,
       options: this.options,
       rootDir: this.rootDir
     });
@@ -75,6 +81,7 @@ export default class Parcel {
 
     this.reporterRunner = new ReporterRunner({
       targets,
+      config,
       options: this.options
     });
 
@@ -96,6 +103,7 @@ export default class Parcel {
       this.watcher.watch(this.options.projectRoot);
       this.watcher.on('all', (event, path) => {
         if (path.includes('.parcel-cache')) return; // TODO: unwatch from watcher, couldn't get it working
+        // TODO: filter out dist changes
         console.log('DETECTED CHANGE', event, path);
         this.assetGraphBuilder.respondToFSChange({
           action: event,
@@ -127,24 +135,25 @@ export default class Parcel {
       console.log('DONE BUILDING ASSET GRAPH');
       dumpGraphToGraphViz(assetGraph, 'MainAssetGraph');
 
-      // let bundleGraph = await this.bundle(assetGraph);
-      // dumpGraphToGraphViz(bundleGraph, 'BundleGraph');
+      let bundleGraph = await this.bundle(assetGraph);
+      console.log('BUNDLE GRAPH', prettyFormat(bundleGraph));
+      dumpGraphToGraphViz(bundleGraph, 'BundleGraph');
 
-      // await this.package(bundleGraph);
+      await this.package(bundleGraph);
 
-      // this.reporterRunner.report({
-      //   type: 'buildSuccess',
-      //   changedAssets: new Map(this.assetGraphBuilder.changedAssets),
-      //   assetGraph: new MainAssetGraph(assetGraph),
-      //   bundleGraph: new BundleGraph(bundleGraph),
-      //   buildTime: Date.now() - startTime
-      // });
+      this.reporterRunner.report({
+        type: 'buildSuccess',
+        changedAssets: new Map(this.assetGraphBuilder.changedAssets),
+        assetGraph: new MainAssetGraph(assetGraph),
+        bundleGraph: new BundleGraph(bundleGraph),
+        buildTime: Date.now() - startTime
+      });
 
-      // if (!this.options.watch && this.options.killWorkers !== false) {
-      //   await this.farm.end();
-      // }
+      if (!this.options.watch && this.options.killWorkers !== false) {
+        await this.farm.end();
+      }
 
-      // return bundleGraph;
+      return bundleGraph;
     } catch (e) {
       if (!(e instanceof BuildAbortError)) {
         this.reporterRunner.report({

@@ -76,22 +76,22 @@ export default class Transformation {
     };
 
     let parcelConfig = await this.loadConfig(configRequest);
-    let configs = {parcel: parcelConfig.content.getTransformerNames(filePath)};
+    let configs = {parcel: parcelConfig.result.getTransformerNames(filePath)};
 
     for (let [moduleName] of parcelConfig.devDeps) {
-      let plugin = await parcelConfig.content.loadPlugin(moduleName);
+      let plugin = await parcelConfig.result.loadPlugin(moduleName);
       // TODO: implement loadPlugin in existing plugins that require config
       if (plugin.loadConfig) {
         configs[moduleName] = await this.loadTransformerConfig(
           filePath,
           moduleName,
           parcelConfig.resolvedPath
-        ).content;
+        ).result;
       }
     }
 
     let pipeline = new Pipeline(
-      await parcelConfig.content.getTransformers(filePath),
+      await parcelConfig.result.getTransformers(filePath),
       configs,
       this.options
     );
