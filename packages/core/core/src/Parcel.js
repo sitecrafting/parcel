@@ -94,19 +94,34 @@ export default class Parcel {
     this._initialized = true;
   }
 
-  async run(): Promise<BundleGraph> {
+  // `run()` returns `Promise<?BundleGraph>` because in watch mode it does not
+  // return a bundle graph, but outside of watch mode it always will.
+  async run(): Promise<?BundleGraph> {
     if (!this._initialized) {
       await this.init();
     }
 
-    this.assetGraphBuilder.on('invalidate', () => {
-      this.build();
-    });
+    let resolvedOptions = nullthrows(this.resolvedOptions);
 
-    return this.build();
+    try {
+      this.assetGraphBuilder.on('invalidate', () => {
+        this.build();
+      });
+
+      let graph = this.build();
+      if (!resolvedOptions.watch) {
+        return graph;
+      }
+    } catch (e) {
+      if (!resolvedOptions.watch) {
+        throw e;
+      }
+    }
   }
 
   async build(): Promise<BundleGraph> {
+    let resolvedOptions = nullthrows(this.resolvedOptions);
+
     try {
       this.reporterRunner.report({
         type: 'buildStart'
@@ -129,7 +144,6 @@ export default class Parcel {
         buildTime: Date.now() - startTime
       });
 
-      let resolvedOptions = nullthrows(this.resolvedOptions);
       if (!resolvedOptions.watch && resolvedOptions.killWorkers !== false) {
         await this.farm.end();
       }
@@ -137,11 +151,12 @@ export default class Parcel {
       return new BundleGraph(bundleGraph);
     } catch (e) {
       if (!(e instanceof BuildAbortError)) {
-        this.reporterRunner.report({
+        await this.reporterRunner.report({
           type: 'buildFailure',
           error: e
         });
       }
+
       throw e;
     }
   }
