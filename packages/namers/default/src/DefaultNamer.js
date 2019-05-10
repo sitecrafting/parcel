@@ -1,6 +1,6 @@
 // @flow strict-local
 
-import type {Bundle, FilePath} from '@parcel/types';
+import type {Bundle, FilePath, Target} from '@parcel/types';
 
 import {Namer} from '@parcel/plugin';
 import assert from 'assert';
@@ -8,6 +8,8 @@ import crypto from 'crypto';
 import path from 'path';
 
 const COMMON_NAMES = new Set(['index', 'src', 'lib']);
+
+const namedTargets: Set<Target> = new Set();
 
 export default new Namer({
   name(bundle, bundleGraph, opts) {
@@ -35,13 +37,15 @@ export default new Namer({
     }
 
     let firstBundleInGroup = bundleGroupBundles[0];
+    let target = bundle.target;
     if (
       bundle.id === firstBundleInGroup.id &&
       bundle.isEntry &&
-      bundle.target &&
-      bundle.target.distEntry != null
+      target &&
+      !namedTargets.has(target) &&
+      target.distEntry != null
     ) {
-      let distEntry = bundle.target.distEntry;
+      let distEntry = target.distEntry;
       let distExt = path.extname(distEntry);
       // If there is a specified distEntry, but this main bundle does not match
       // its type, throw informing the user. This can happen if a target destination
@@ -54,6 +58,7 @@ export default new Namer({
           }"`
         );
       }
+      namedTargets.add(target);
       return distEntry;
     }
 
