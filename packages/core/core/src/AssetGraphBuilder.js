@@ -7,7 +7,7 @@ import type {
   Dependency,
   Target,
   TransformerRequest,
-  Asset
+  Asset as IAsset
 } from '@parcel/types';
 import type Config from './Config';
 import EventEmitter from 'events';
@@ -20,6 +20,7 @@ import {PromiseQueue} from '@parcel/utils';
 import AssetGraph from './AssetGraph';
 import ResolverRunner from './ResolverRunner';
 import WorkerFarm from '@parcel/workers';
+import {Asset} from './public/Asset';
 
 type BuildOpts = {|
   signal: AbortSignal,
@@ -42,7 +43,7 @@ export default class AssetGraphBuilder extends EventEmitter {
   controller: AbortController;
   farm: WorkerFarm;
   runTransform: (file: TransformerRequest) => Promise<any>;
-  changedAssets: Map<string, Asset>;
+  changedAssets: Map<string, IAsset>;
 
   constructor({config, options, entries, targets, transformerRequest}: Opts) {
     super();
@@ -159,7 +160,7 @@ export default class AssetGraphBuilder extends EventEmitter {
 
     for (let asset of cacheEntry.assets) {
       asset.stats.time = time;
-      this.changedAssets.set(asset.id, asset);
+      this.changedAssets.set(asset.id, new Asset(asset));
     }
 
     if (signal.aborted) throw new BuildAbortError();
