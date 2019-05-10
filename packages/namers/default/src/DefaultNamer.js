@@ -41,7 +41,20 @@ export default new Namer({
       bundle.target &&
       bundle.target.distEntry != null
     ) {
-      return bundle.target.distEntry;
+      let distEntry = bundle.target.distEntry;
+      let distExt = path.extname(distEntry);
+      // If there is a specified distEntry, but this main bundle does not match
+      // its type, throw informing the user. This can happen if a target destination
+      // is specified in package.json, but the transformed entry files don't match
+      // its type.
+      if (distExt !== '' && distExt !== '.' + bundle.type) {
+        throw new Error(
+          `Target destination ${distEntry} does not match type of entry "${
+            bundle.type
+          }"`
+        );
+      }
+      return distEntry;
     }
 
     // Base split bundle names on the first bundle in their group.
