@@ -1,5 +1,6 @@
 {
   "name": "parcel",
+  "version": "1.12.3-sc-patch",
   "description": "Blazing fast, zero configuration web application bundler",
   "license": "MIT",
   "repository": {
